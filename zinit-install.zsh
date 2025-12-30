@@ -312,6 +312,8 @@ builtin source "${ZINIT[BIN_DIR]}/zinit-side.zsh" || {
 
     local -A sites
     sites=(
+        github-tag github.com/gh-tag
+        gh-tag     github.com/gh-tag
         github    github.com
         gh        github.com
         bitbucket bitbucket.org
@@ -413,49 +415,87 @@ builtin source "${ZINIT[BIN_DIR]}/zinit-side.zsh" || {
                 builtin print -r -- $REPLY >! ._zinit/is_release
                 ziextract "$REPLY"
             ) || return $?
-        } elif [[ $tpe = github ]] {
+        } elif [[ $tpe = github || "${ICE[from]}" = (gh-tag|github-tag)* ]] {
+            local tag_to_clone
+            if [[ "${ICE[from]}" = (gh-tag|github-tag)* ]]; then
+                # This is a gh-tag operation. Reset `site` for correct URL construction.
+                site="github.com"
+                if [[ "${ICE[from]}" =~ "'([^']*)'" ]]; then
+                    tag_to_clone="${match[1]}"
+                    +zi-log "{info}Preparing to clone pinned tag {version}$tag_to_clone{rst} for {pid}$remote_url_path{rst}"
+                else
+                    +zi-log "{info}Finding latest tag for {pid}$remote_url_path{rst}..."
+                    if (( ! ${+commands[git]} )); then
+                        +zi-log "{e} Required command not found: {cmd}git{rst}. Cannot find latest tag."
+                        return 1
+                    fi
+                    tag_to_clone=$(command git ls-remote --tags --sort=-v:refname "https://github.com/$remote_url_path" | head -n1 | cut -f2 | sed 's|refs/tags/||;s/\^{}//')
+                    if [[ -z "$tag_to_clone" ]]; then
+                        +zi-log "{e} Could not determine latest tag for {pid}$remote_url_path{rst}."
+                        return 1
+                    fi
+                    +zi-log "{info}Latest tag is {version}$tag_to_clone{rst}"
+                fi
+            fi
+
             case ${ICE[proto]} in
                 (|ftp(|s)|git|http(|s)|rsync|ssh)
                     :zinit-git-clone() {
+                        # (The git-clone function using the array is correct and remains the same)
                         local clone_url
                         if [[ ${ICE[proto]} == "ssh" ]]; then
                             clone_url="git@${site:-${ICE[from]:-github.com}}:$remote_url_path"
                         else
                             clone_url="${ICE[proto]:-https}://${site:-${ICE[from]:-github.com}}/$remote_url_path"
                         fi
-                        command git clone --progress ${(s: :)ICE[cloneopts]---recursive} \
-                            ${(s: :)ICE[depth]:+--depth ${ICE[depth]}} \
-                            "$clone_url" \
-                            "$local_path" \
+
+                        local -a clone_opts
+                        clone_opts=(--progress ${(s: :)ICE[cloneopts]---recursive})
+
+                        if [[ -n "$tag_to_clone" ]]; then
+                            clone_opts+=(--branch "$tag_to_clone" --depth 1)
+                        else
+                            if [[ -n ${ICE[depth]} ]]; then
+                                clone_opts+=(--depth "${ICE[depth]}")
+                            fi
+                        fi
+
+                        command git clone "${clone_opts[@]}" "$clone_url" "$local_path" \
                             --config transfer.fsckobjects=false \
                             --config receive.fsckobjects=false \
                             --config fetch.fsckobjects=false \
                             --config pull.rebase=false
-                            integer retval=$?
-                            unfunction :zinit-git-clone
-                            return $retval
+                        integer retval=$?
+                        unfunction :zinit-git-clone
+                        return $retval
                     }
-                    :zinit-git-clone |& { command ${ZINIT[BIN_DIR]}/share/git-process-output.zsh || cat; }
-                    if (( pipestatus[1] == 141 )) {
+                    
+                    if [[ -n "$tag_to_clone" ]]; then
                         :zinit-git-clone
                         integer retval=$?
-                        if (( retval )) {
-                            builtin print -Pr -- "$ZINIT[col-error]Clone failed (code: $ZINIT[col-obj]$retval$ZINIT[col-error]).%f%b"
-                            return 1
+                        if (( retval )) { return 1 }
+                    else
+                        :zinit-git-clone |& { command ${ZINIT[BIN_DIR]}/share/git-process-output.zsh || cat; }
+                        if (( pipestatus[1] != 0 && pipestatus[1] != 141 )) {
+                             builtin print -Pr -- "$ZINIT[col-error]Clone failed (code: $ZINIT[col-obj]$pipestatus[1]$ZINIT[col-error]).%f%b"
+                             return 1
                         }
-                    } elif (( pipestatus[1] )) {
-                        builtin print -Pr -- "$ZINIT[col-error]Clone failed (code: $ZINIT[col-obj]$pipestatus[1]$ZINIT[col-error]).%f%b"
-                        return 1
-                    }
+                    fi
                     ;;
                 (*)
                     builtin print -Pr "${ZINIT[col-error]}Unknown protocol:%f%b ${ICE[proto]}."
                     return 1
             esac
 
-            if [[ -n ${ICE[ver]} ]] {
+            # After a successful clone, if we used gh-tag, store the tag
+            if [[ -n "$tag_to_clone" ]]; then
+                command mkdir -p "$local_path/._zinit" && echo "$tag_to_clone" >! "$local_path/._zinit/tag"
+            fi
+
+            # Handle the `ver` ice ONLY if we are NOT doing a gh-tag clone
+            if [[ -n ${ICE[ver]} && -z "$tag_to_clone" ]]; then
                 command git -C "$local_path" checkout "${ICE[ver]}"
-            }
+            fi
         }
 
         if [[ $update != -u ]] {
