@@ -1991,6 +1991,10 @@ print -- "\nAvailable ice-modifiers:\n\n${ice_order[*]}"
         local nl=$'\n' escape=$'\x1b['
         # Dynamically get the current branch name for logging and pulling
         local current_branch=$(command git -C $ZINIT[BIN_DIR] rev-parse --abbrev-ref HEAD)
+        # Warn if user is not on main (requested by maintainer)
+        if [[ -n $current_branch && $current_branch != main ]]; then
+            +zi-log "{pre}[self-update]{warn} non-{obj}main{warn} branch detected: {obj}${current_branch}{warn}. Self-update will pull from the branch’s configured upstream.{rst}"
+        fi
         local -a lines
         (
             builtin cd -q "$ZINIT[BIN_DIR]" \
