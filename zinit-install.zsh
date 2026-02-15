@@ -267,9 +267,11 @@ builtin source "${ZINIT[BIN_DIR]}/zinit-side.zsh" || {
                 }
             }
 
-            # --move is default (or as explicit, when extract'!…' is given)
-            # Also possible is --move2 when extract'!!…' given
-            ziextract "$fname" ${ICE[extract]---move} ${${(M)ICE[extract]:#!([^!]|(#e))*}:+--move} ${${(M)ICE[extract]:#!!*}:+--move2}
+            # When extract ice is set, the ∞zinit-extract-hook will handle
+            # extraction; otherwise extract here with --move as default.
+            if (( !${+ICE[extract]} )); then
+                ziextract "$fname" --move
+            fi
             return 0
         ) && {
             reply=( "$user" "$plugin" )
@@ -404,7 +406,11 @@ builtin source "${ZINIT[BIN_DIR]}/zinit-side.zsh" || {
                     [[ -d ._zinit ]] || return 2
                     builtin print -r -- $url >! ._zinit/url || return 3
                     builtin print -r -- ${REPLY} >! ._zinit/is_release${count:#1} || return 4
-                    ziextract ${REPLY:t} ${${${#reply}:#1}:+--nobkp} ${${(M)ICE[extract]:#!([^!]|(#e))*}:+--move} ${${(M)ICE[extract]:#!!*}:+--move2}
+                    # When extract ice is set, the ∞zinit-extract-hook will
+                    # handle extraction; otherwise extract here (no move).
+                    if (( !${+ICE[extract]} )); then
+                        ziextract ${REPLY:t} ${${${#reply}:#1}:+--nobkp}
+                    fi
                 }
                 return $?
             ) || {
@@ -1492,6 +1498,15 @@ builtin source "${ZINIT[BIN_DIR]}/zinit-side.zsh" || {
     local url=https://github.com/$user/$plugin/releases/expanded_assets/$tag_version
   else
     local url=https://$urlpart
+  fi
+  if [[ "${ICE[bpick]}" == "src" ]]; then
+    +zi-log "{dbg} {b}gh-r{rst}: bpick\"src\" detected, targeting source code tarball for tag: {version}$tag_version{rst}"
+    # Construct the URL path for the auto-generated source code archive
+    reply=( "/$user/$plugin/archive/refs/tags/$tag_version.tar.gz" )
+    # Ensure the reply isn't empty if tag_version was somehow missed
+    [[ -n "$tag_version" ]] && return 0
+    +zi-log "{e} {b}gh-r{rst}: Could not determine tag version, cannot use bpick\"src\"."
+    return 1
   fi
   init_list=( ${(@f)"$( { .zinit-download-file-stdout $url || .zinit-download-file-stdout $url 1; } 2>/dev/null | command grep -i -o 'href=./'$user'/'$plugin'/releases/download/[^"]\+')"} )
   init_list=(${(L)init_list[@]#href=?})
