@@ -710,7 +710,7 @@ ____
 
 ____
 
-Has 97 line(s). Calls functions:
+Has 114 line(s). Calls functions:
 
  .zinit-load
  |-- +zinit-deploy-message
