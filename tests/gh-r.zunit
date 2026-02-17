@@ -283,10 +283,10 @@
   local git_absorb="$ZBIN/git-absorb"; assert "$git_absorb" is_executable
   run "$git_absorb" --version; assert $state equals 0
 }
-@test 'git-chglog' { # CHANGELOG generator implemented in Go (Golang).
-  run zinit for @git-chglog/git-chglog; assert $state equals 0
-  local git_chglog="$ZBIN/git-chglog"; assert "$git_chglog" is_executable
-  run "$git_chglog" --version; assert $state equals 0
+@test 'git-cliff' { # CHANGELOG generator implemented in Go (Golang).
+  run zinit for @orhun/git-cliff; assert $state equals 0
+  local git_cliff="$ZBIN/git-cliff"; assert "$git_cliff" is_executable
+  run "$git_cliff" --version; assert $state equals 0
 }
 @test 'git-mkver' { # Automatic Semantic Versioning for git based software development
   run zinit ver'v1.2.2' for @idc101/git-mkver; assert $state equals 0
