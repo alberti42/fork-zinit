@@ -62,4 +62,41 @@
   assert __init__.py is_not_value_in $COMPS
 }
 
+@test 'ziextract-permissions' {
+  # Create a temp dir with test files, build a zip, and install via extract ice
+  local tmpdir
+  tmpdir=$(mktemp -d)
+
+  # run_me.sh: +x in archive, has shebang  → must be executable
+  printf '#!/bin/sh\necho run\n' > "$tmpdir/run_me.sh"
+  chmod +x "$tmpdir/run_me.sh"
+
+  # also_run.py: no +x in archive, has shebang  → must be executable (shebang detection)
+  printf '#!/usr/bin/env python3\nprint("hi")\n' > "$tmpdir/also_run.py"
+
+  # library.py: no +x, no shebang  → must NOT be executable
+  printf 'def foo(): pass\n' > "$tmpdir/library.py"
+
+  # pre_marked.sh: +x in archive, no shebang  → must be executable (archive bit)
+  printf 'echo pre\n' > "$tmpdir/pre_marked.sh"
+  chmod +x "$tmpdir/pre_marked.sh"
+
+  # Build zip preserving permissions
+  local zipfile
+  zipfile=$(mktemp /tmp/ziextract-test-XXXXXX.zip)
+  ( cd "$tmpdir" && zip -q "$zipfile" run_me.sh also_run.py library.py pre_marked.sh )
+
+  run zinit as"null" id-as"test/ziextract-permissions" extract for "$zipfile"
+  assert $state equals 0
+
+  local plugdir="$ZPLUGINS/test---ziextract-permissions"
+  assert "$plugdir/run_me.sh"    is_executable
+  assert "$plugdir/also_run.py"  is_executable
+  assert "$plugdir/pre_marked.sh" is_executable
+  assert "$plugdir/library.py"   is_not_executable
+
+  rm -f "$zipfile"
+  rm -rf "$tmpdir"
+}
+
 # vim:ft=zsh:sw=2:sts=2:et:foldmarker=\ {,}:foldmethod=marker
