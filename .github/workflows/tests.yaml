@@ -1,4 +1,4 @@
-name: Unit Tests
+name: tests
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,11 +24,11 @@ on:
 
 jobs:
   zunit-tests:
+    name: ${{ matrix.zunit_test }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest]
         zunit_test:
           - annexes
           - commands
@@ -37,6 +37,7 @@ jobs:
           - ices
           - plugins
           - snippets
+        os: [macos-latest, ubuntu-latest]
 
     steps:
       - name: checkout ${{ github.repository }}
