@@ -1508,9 +1508,9 @@ builtin source "${ZINIT[BIN_DIR]}/zinit-side.zsh" || {
 } # ]]]
 # FUNCTION: ziextract [[[
 # If the file is an archive, it is extracted by this function.
-# Next stage is scanning of files with the common utility file
-# to detect executables. They are given +x mode. There are also
-# messages to the user on performed actions.
+# Next stage is detecting executables via two criteria: (1) files that
+# already carry the execute bit in the archive, and (2) files with a
+# shebang (#!) line. Detected files are given +x mode.
 #
 # $1 - url
 # $2 - file
@@ -1751,12 +1751,16 @@ ziextract() {
     }
     unfunction -- .zinit-extract-wrapper
 
-    local -aU execs
-    execs=( **/*~(._zinit(|/*)|.git(|/*)|.svn(|/*)|.hg(|/*)|._backup(|/*))(DN-.) )
-    if [[ ${#execs} -gt 0 && -n $execs ]] {
-        execs=( ${(@f)"$( file ${execs[@]} )"} )
-        execs=( "${(M)execs[@]:#[^(:]##:*executable*}" )
-        execs=( "${execs[@]/(#b)([^(:]##):*/${match[1]}}" )
+    local -aU all_files execs
+    # Collect all regular files in the extracted tree
+    all_files=( **/*~(._zinit(|/*)|.git(|/*)|.svn(|/*)|.hg(|/*)|._backup(|/*))(DN-.) )
+    # Step 1: trust execute permissions already set by the archive extractor
+    execs=( **/*~(._zinit(|/*)|.git(|/*)|.svn(|/*)|.hg(|/*)|._backup(|/*))(DN-*.) )
+    # Step 2: additionally mark files that have a shebang but were not +x in the archive
+    local _zi_f _zi_shebang
+    for _zi_f ( ${all_files:|execs} ) {
+        read -rk 2 _zi_shebang <"$_zi_f" 2>/dev/null
+        [[ "$_zi_shebang" == '#!' ]] && execs+=( "$_zi_f" )
     }
 
     builtin print -rl -- ${execs[@]} >! ${TMPDIR:-/tmp}/zinit-execs.$$.lst
