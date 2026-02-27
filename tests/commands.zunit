@@ -64,34 +64,24 @@
 
 @test 'self-update' {
   run zinit self-update
+@test 'self-update' {
+  local cmd='self-update'
+  run zinit $cmd
   assert $output matches 'Already up to date'; assert $state equals 0
 
-  run zinit self-update --help
-  assert $output matches '.*(HELP).*(self-update).*'; assert $state equals 1
+  for flag in '-h' '--help'; do
+    run zinit $cmd $flag
+    assert $output matches ".*(HELP).*($cmd).*"; assert $state equals 1
+  done
 
-  run zinit self-update --quiet
-  assert $output is_empty; assert $state equals 0
-}
-@test 'self-update --help / -h shows help and exits 1' {
-  for flag in '--help' '-h'; do
-    run zinit self-update $flag
-    assert $output contains 'self-update'
-    assert $output contains '--quiet'
-    assert $state equals 1
+  for flag in '-q' '--quiet'; do
+    run zinit $cmd $flag;
+    assert $output is_empty; assert $state equals 0
   done
+
+  run zinit $cmd --invalid
+  assert $output matches ".*(Incorrect options given).*(--invalid).*(Allowed for the subcommand.*$cmd).*"; assert $state equals 1
 }
-@test 'self-update --quiet / -q suppresses output' {
-  for flag in '--quiet' '-q'; do
-    run zinit self-update $flag
-    assert $output is_empty
-    assert $state equals 0
-  done
-}
-@test 'self-update rejects unknown flags' {
-  run zinit self-update --foo
-  assert $output contains 'Incorrect options given'
-  assert $output contains '--foo'
-  assert $state equals 1
 }
 @test 'set-debug' {
   ZINIT+=(DEBUG 'true')
