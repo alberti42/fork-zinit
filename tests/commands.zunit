@@ -63,8 +63,6 @@
 }
 
 @test 'self-update' {
-  run zinit self-update
-@test 'self-update' {
   local cmd='self-update'
   run zinit $cmd
   assert $output matches 'Already up to date'; assert $state equals 0
