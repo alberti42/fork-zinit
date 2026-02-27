@@ -80,7 +80,6 @@
   run zinit $cmd --invalid
   assert $output matches ".*(Incorrect options given).*(--invalid).*(Allowed for the subcommand.*$cmd).*"; assert $state equals 1
 }
-}
 @test 'set-debug' {
   ZINIT+=(DEBUG 'true')
   run +zi-log -n '{dbg} message'
